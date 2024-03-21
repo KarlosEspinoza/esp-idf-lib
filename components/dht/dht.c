@@ -48,6 +48,17 @@
 
 // DHT timer precision in microseconds
 #define DHT_TIMER_INTERVAL 2
+#ifdef CONFIGEXAMPLE_TYPE_DHT11
+#define DHT_TIMER_INTERVAL 1
+#define PHASE_B_TIMEOUT 40
+#define PHASE_C_TIMEOUT 80
+#define PHASE_D_TIMEOUT 80
+#define PHASE_E_TIMEOUT 60
+#else
+#define PHASE_B_TIMEOUT 40
+#define PHASE_C_TIMEOUT 88
+#define PHASE_D_TIMEOUT 88
+#endif
 #define DHT_DATA_BITS 40
 #define DHT_DATA_BYTES (DHT_DATA_BITS / 8)
 
@@ -142,21 +153,38 @@ static inline esp_err_t dht_fetch_data(dht_sensor_type_t sensor_type, gpio_num_t
     uint32_t low_duration;
     uint32_t high_duration;
 
+#if CONFIGEXAMPLE_TYPE_DHT11
+#endif
+#if CONFIGEXAMPLE_TYPE_DHT11
+    gpio_set_direction(pin, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(pin, GPIO_PULLUP_ONLY);
+    ets_delay_us(1000);
+#endif
+
     // Phase 'A' pulling signal low to initiate read sequence
     gpio_set_direction(pin, GPIO_MODE_OUTPUT_OD);
     gpio_set_level(pin, 0);
     ets_delay_us(sensor_type == DHT_TYPE_SI7021 ? 500 : 20000);
     gpio_set_level(pin, 1);
+#if CONFIGEXAMPLE_TYPE_DHT11
+    gpio_set_direction(pin, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(pin, GPIO_PULLUP_ONLY);
+    ets_delay_us(40);
+#endif
 
-    // Step through Phase 'B', 40us
-    CHECK_LOGE(dht_await_pin_state(pin, 40, 0, NULL),
+    // Step through Phase 'B', us
+    CHECK_LOGE(dht_await_pin_state(pin, PHASE_B_TIMEOUT, 0, NULL),
             "Initialization error, problem in phase 'B'");
-    // Step through Phase 'C', 88us
-    CHECK_LOGE(dht_await_pin_state(pin, 88, 1, NULL),
+    // Step through Phase 'C', us
+    CHECK_LOGE(dht_await_pin_state(pin, PHASE_C_TIMEOUT, 1, NULL),
             "Initialization error, problem in phase 'C'");
-    // Step through Phase 'D', 88us
-    CHECK_LOGE(dht_await_pin_state(pin, 88, 0, NULL),
+    // Step through Phase 'D', us
+    CHECK_LOGE(dht_await_pin_state(pin, PHASE_D_TIMEOUT, 0, NULL),
             "Initialization error, problem in phase 'D'");
+#if CONFIGEXAMPLE_TYPE_DHT11
+    // Step through Phase 'E', us
+    CHECK_LOGE(dht_await_pin_state(pin, PHASE_E_TIMEOUT, 0, NULL), "Error in phase 'E'");
+#endif
 
     // Read in each of the 40 bits of data...
     for (int i = 0; i < DHT_DATA_BITS; i++)
